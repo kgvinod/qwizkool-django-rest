@@ -1,0 +1,1 @@
+# qwizkool-django-rest
