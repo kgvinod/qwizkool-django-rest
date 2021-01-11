@@ -18,10 +18,12 @@ from django.urls import include, path
 from rest_framework import routers
 from quiz import views
 
+#router.register(r'quiz/\d+/question/\d+/choice', views.ChoiceViewSet)
+
 router = routers.DefaultRouter()
+router.register(r'quiz/question/choice', views.ChoiceViewSet)
+router.register(r'quiz/question', views.QuestionViewSet)
 router.register(r'quiz', views.QuizViewSet)
-router.register(r'question', views.QuestionViewSet)
-router.register(r'choice', views.ChoiceViewSet)
 
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.
