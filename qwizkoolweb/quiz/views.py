@@ -21,6 +21,8 @@ import time
 import wikipedia
 import sys
 
+import threading
+
 
 # Documentation:
 # https://www.django-rest-framework.org/api-guide/viewsets/
@@ -34,7 +36,8 @@ class QuizViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['id', 'title_text']
     
-    # detail=False: operate on /quiz/  detail=True:operate on /quiz/pk 
+    # detail=False: operate on /quiz/  
+    # detail=True: operate on /quiz/pk  E.g. /quiz/pk/create_questions
     @action(detail=False, methods=['post'])
     def create_quiz(self, request, pk=None):
         return Response({'status': 'parse completed'})
@@ -42,15 +45,20 @@ class QuizViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def create_questions(self, request, pk=None):
         quiz = self.get_object()
-        create_quiz(quiz.title_text)
-        return Response({'status': 'questions completed'})        
+        quiz.status_text = 'PARSING'
+        quiz.save()
+        t = threading.Thread(target=create_quiz, args=[quiz.id])
+        t.setDaemon(True)
+        t.start()
+        #create_quiz(quiz.title_text)
+        return Response({'status': 'started parsing..'})        
 
 
 class QuestionViewSet(viewsets.ModelViewSet):
     queryset = models.Question.objects.all()
     serializer_class = serializers.QuestionSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['id']
+    filterset_fields = ['id', 'quiz']
 
 
 class ChoiceViewSet(viewsets.ModelViewSet):
@@ -59,10 +67,12 @@ class ChoiceViewSet(viewsets.ModelViewSet):
 
 
  
-def create_quiz(topic):
+def create_quiz(quiz_id):
+
+    new_quiz = Quiz.objects.get(pk=quiz_id)
 
     qk_ctx = QkContext('small')
-    wiki_article = WikipediaArticle(topic, qk_ctx)
+    wiki_article = WikipediaArticle(new_quiz.title_text, qk_ctx)
 
     try:
         wiki_article.open()
@@ -76,7 +86,7 @@ def create_quiz(topic):
         e_str = format(sys.exc_info()[1])
         e_str_html = e_str.replace("\n", "<br />") 
         context = {
-            'topic': topic, 
+            'topic': new_quiz.title_text, 
             'information': e_str_html,
         }
         #return render(request, 'quiz/create_quiz_fail.html', context)
@@ -86,12 +96,14 @@ def create_quiz(topic):
     quiz_nlp = QuizNLP(wiki_article)
     print("The Quiz has " + str(len(quiz_nlp.questions)) + " questions.")
 
-    new_quiz = Quiz.objects.create(title_text=quiz_nlp.article.title, description_text=quiz_nlp.article.sentences[0])
-    new_quiz.save()
+    #new_quiz = Quiz.objects.create(title_text=quiz_nlp.article.title, description_text=quiz_nlp.article.sentences[0])
+    #new_quiz.save()
 
     for question in quiz_nlp.questions:
         new_question = Question.objects.create(quiz=new_quiz, question_text=question.question_line)
         new_question.save()
+        new_quiz.question_count += 1
+        new_quiz.save()
         
         for choice in question.choices:
             new_choice = Choice.objects.create(question=new_question, choice_text=choice, is_correct=(question.answer==choice))
@@ -99,10 +111,12 @@ def create_quiz(topic):
 
     first_question = list(new_quiz.question_set.all())[0] 
     context = {
-        'topic': topic, 
+        'topic': new_quiz.title_text, 
         'description' : quiz_nlp.article.sentences[0],
         'information' : "The Quiz has " + str(len(quiz_nlp.questions)) + " questions.",
         'question' : first_question               
         }
 
+    new_quiz.status_text = 'READY'
+    new_quiz.save()
     #return render(request, 'quiz/create_quiz_success.html', context)     

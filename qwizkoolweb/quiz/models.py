@@ -7,6 +7,9 @@ class Quiz(models.Model):
     title_text = models.CharField(max_length=80)    
     description_text = models.CharField(max_length=800)
     pub_date = models.DateTimeField(verbose_name='date published', auto_now_add=True, blank=True)
+    status_text = models.CharField(default='INITIAL', max_length=80)
+    question_count = models.IntegerField(default=0)
+
 
     def was_published_recently(self):
         return self.pub_date >= timezone.now() - datetime.timedelta(days=1)

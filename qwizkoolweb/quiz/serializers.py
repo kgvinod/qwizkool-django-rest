@@ -10,6 +10,8 @@ class QuizSerializer(serializers.ModelSerializer):
             'title_text',
             'description_text',
             'pub_date',
+            'status_text',
+            'question_count'
         ]
 
 class QuestionSerializer(serializers.ModelSerializer):
